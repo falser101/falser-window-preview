@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.falser101.window-preview",
+  "name": "Window Preview",
+  "version": "1.0.0",
+  "author": "falser101",
+  "license": "MIT",
+  "description": "KDE Overview–style window browser for Omarchy: workspace strip, responsive previews, hot corners, activate to jump.",
+  "preview": "preview.png",
+  "kinds": ["overlay"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Overlay.qml"
+  }
+}
