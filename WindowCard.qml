@@ -82,22 +82,13 @@ Item {
       z: 1
     }
 
-    Item {
-      anchors.centerIn: parent
-      width: parent.width * 2
-      height: parent.height * 2
-      scale: 0.5
-      layer.enabled: true
-      layer.smooth: true
-
-      ScreencopyView {
-        id: preview
-        anchors.fill: parent
-        captureSource: card.wayland
-        live: false
-        paintCursor: false
-        Component.onCompleted: card.recapture()
-      }
+    ScreencopyView {
+      id: preview
+      anchors.fill: parent
+      captureSource: card.wayland
+      live: false
+      paintCursor: false
+      Component.onCompleted: card.recapture()
     }
   }
 

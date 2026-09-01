@@ -39,6 +39,7 @@ Item {
   property bool opened: false
   property string filterText: ""
   property int selectedIndex: 0
+  property var selectedToplevel: null
   property int viewWorkspaceId: 1
   property int modelRevision: 0
   // "windows" = navigate the preview grid; "workspaces" = navigate the strip
@@ -137,9 +138,11 @@ Item {
       root.viewWorkspaceId = 1
     root.modelRevision++
     root.selectedIndex = root.slotIndexForToplevel(Hyprland.activeToplevel)
+    root.syncSelectedToplevel()
     Qt.callLater(function() {
       root.modelRevision++
       root.selectedIndex = root.slotIndexForToplevel(Hyprland.activeToplevel)
+      root.syncSelectedToplevel()
       keyCatcher.forceActiveFocus()
     })
   }
@@ -176,15 +179,23 @@ Item {
     root.focusPane = "windows"
     root.selectedIndex = 0
     root.modelRevision++
+    root.syncSelectedToplevel()
+  }
+
+  function syncSelectedToplevel() {
+    var slot = root.layoutSlots[root.selectedIndex]
+    root.selectedToplevel = (slot && slot.top) ? slot.top : null
   }
 
   function selectAbsolute(index) {
     root.focusPane = "windows"
     if (root.layoutSlots.length === 0) {
       root.selectedIndex = 0
+      root.selectedToplevel = null
       return
     }
     root.selectedIndex = Math.max(0, Math.min(index, root.layoutSlots.length - 1))
+    root.syncSelectedToplevel()
     root.ensureSlotVisible(root.selectedIndex)
   }
 
@@ -195,6 +206,7 @@ Item {
     if (next < 0) next = root.layoutSlots.length - 1
     if (next >= root.layoutSlots.length) next = 0
     root.selectedIndex = next
+    root.syncSelectedToplevel()
     root.ensureSlotVisible(root.selectedIndex)
   }
 
@@ -215,6 +227,7 @@ Item {
     root.focusPane = "workspaces"
     root.filterText = ""
     root.selectedIndex = 0
+    root.selectedToplevel = null
     root.modelRevision++
 
     var workspace = WindowModel.workspaceById(root.allWorkspaces, id)
@@ -225,6 +238,7 @@ Item {
 
     Qt.callLater(function() {
       root.selectedIndex = root.slotIndexForToplevel(Hyprland.activeToplevel)
+      root.syncSelectedToplevel()
       keyCatcher.forceActiveFocus()
     })
   }
@@ -270,8 +284,25 @@ Item {
   }
 
   function refreshSelectionBounds() {
-    if (root.selectedIndex >= root.layoutSlots.length)
-      root.selectedIndex = Math.max(0, root.layoutSlots.length - 1)
+    if (root.layoutSlots.length === 0) {
+      root.selectedIndex = 0
+      root.selectedToplevel = null
+      return
+    }
+
+    // Keep selection on the same window when the grid reshuffles.
+    if (root.selectedToplevel) {
+      var kept = root.slotIndexForToplevel(root.selectedToplevel)
+      if (root.layoutSlots[kept] && root.layoutSlots[kept].top === root.selectedToplevel) {
+        root.selectedIndex = kept
+        return
+      }
+    }
+
+    // Closed (or filtered away): stay on the same slot index (= next window
+    // in visual order), or the previous one if we were at the end.
+    root.selectedIndex = Math.max(0, Math.min(root.selectedIndex, root.layoutSlots.length - 1))
+    root.syncSelectedToplevel()
   }
 
   Connections {
@@ -300,6 +331,7 @@ Item {
         if (id > 0 && id !== root.viewWorkspaceId) {
           root.viewWorkspaceId = id
           root.selectedIndex = 0
+          root.selectedToplevel = null
           root.modelRevision++
         }
       }
@@ -491,8 +523,13 @@ Item {
         } else if (event.key === Qt.Key_Down) {
           if (root.focusPane === "workspaces") {
             root.focusPane = "windows"
-            if (root.filteredToplevels.length > 0)
-              root.selectedIndex = Math.min(root.selectedIndex, root.filteredToplevels.length - 1)
+            if (root.layoutSlots.length > 0) {
+              root.selectedIndex = Math.min(root.selectedIndex, root.layoutSlots.length - 1)
+              root.syncSelectedToplevel()
+            } else {
+              root.selectedIndex = 0
+              root.selectedToplevel = null
+            }
           } else {
             root.selectRow(1)
           }
@@ -557,7 +594,11 @@ Item {
         width: parent.width
         height: parent.height - root.stripHeight - root.headerHeight - root.footerHeight - root.contentSpacing * 3
 
-        MouseArea { anchors.fill: parent; onClicked: {} }
+        // Empty gaps dismiss; WindowCard MouseAreas sit above and take clicks.
+        MouseArea {
+          anchors.fill: parent
+          onClicked: root.dismiss()
+        }
 
         Text {
           anchors.centerIn: parent
