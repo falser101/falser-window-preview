@@ -56,6 +56,7 @@ Item {
     return WindowModel.collect(root.allToplevels, root.filterText, root.viewWorkspaceId)
   }
   readonly property var viewWorkspace: WindowModel.workspaceById(root.allWorkspaces, root.viewWorkspaceId)
+  readonly property string viewWorkspaceLabel: WindowModel.workspaceLabel(root.allWorkspaces, root.viewWorkspaceId)
 
   readonly property string wallpaperPath: Quickshell.env("HOME") + "/.local/state/omarchy/current/background"
   readonly property color foreground: "#f2f2f2"
@@ -131,11 +132,7 @@ Item {
     root.opened = true
     root.filterText = ""
     root.focusPane = "windows"
-    root.viewWorkspaceId = Hyprland.focusedWorkspace
-      ? Number(Hyprland.focusedWorkspace.id)
-      : 1
-    if (root.viewWorkspaceId <= 0)
-      root.viewWorkspaceId = 1
+    root.viewWorkspaceId = root.initialWorkspaceId()
     root.modelRevision++
     root.selectedIndex = root.slotIndexForToplevel(Hyprland.activeToplevel)
     root.syncSelectedToplevel()
@@ -145,6 +142,31 @@ Item {
       root.syncSelectedToplevel()
       keyCatcher.forceActiveFocus()
     })
+  }
+
+  // Open on the special workspace when its window has focus, else on the focused workspace.
+  function initialWorkspaceId() {
+    var active = Hyprland.activeToplevel
+    var activeWorkspace = active && active.workspace ? active.workspace : null
+    if (activeWorkspace && WindowModel.isSpecialWorkspaceId(activeWorkspace.id))
+      return Number(activeWorkspace.id)
+    var focused = Hyprland.focusedWorkspace ? Number(Hyprland.focusedWorkspace.id) : 1
+    return WindowModel.isValidWorkspaceId(focused) ? focused : 1
+  }
+
+  function focusWorkspaceId(id) {
+    var workspace = WindowModel.workspaceById(root.allWorkspaces, id)
+    if (WindowModel.isSpecialWorkspaceId(id)) {
+      // hl.dsp.focus on a special workspace opens it; it does not toggle it closed.
+      var name = String((workspace && workspace.name) || "")
+      if (name)
+        Hyprland.dispatch('hl.dsp.focus({ workspace = "' + name + '" })')
+      return
+    }
+    if (workspace && typeof workspace.activate === "function")
+      workspace.activate()
+    else
+      Hyprland.dispatch('hl.dsp.focus({ workspace = "' + id + '" })')
   }
 
   function slotIndexForToplevel(toplevel) {
@@ -220,7 +242,7 @@ Item {
 
   function selectWorkspace(workspaceId) {
     var id = Number(workspaceId)
-    if (!isFinite(id) || id <= 0)
+    if (!WindowModel.isValidWorkspaceId(id))
       return
 
     root.viewWorkspaceId = id
@@ -230,11 +252,7 @@ Item {
     root.selectedToplevel = null
     root.modelRevision++
 
-    var workspace = WindowModel.workspaceById(root.allWorkspaces, id)
-    if (workspace && typeof workspace.activate === "function")
-      workspace.activate()
-    else
-      Hyprland.dispatch('hl.dsp.focus({ workspace = "' + id + '" })')
+    root.focusWorkspaceId(id)
 
     Qt.callLater(function() {
       root.selectedIndex = root.slotIndexForToplevel(Hyprland.activeToplevel)
@@ -256,6 +274,10 @@ Item {
     var wayland = WindowModel.waylandFor(top)
     if (!wayland || typeof wayland.activate !== "function")
       return
+    // A hidden special workspace must be open before its window can take focus.
+    var workspace = top && top.workspace ? top.workspace : null
+    if (workspace && WindowModel.isSpecialWorkspaceId(workspace.id))
+      root.focusWorkspaceId(Number(workspace.id))
     wayland.activate()
     root.dismiss()
   }
@@ -577,8 +599,8 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           textFormat: Text.PlainText
           text: root.filterText
-            ? ("Search on workspace " + root.viewWorkspaceId + ": " + root.filterText)
-            : ("Workspace " + root.viewWorkspaceId
+            ? ("Search on workspace " + root.viewWorkspaceLabel + ": " + root.filterText)
+            : ("Workspace " + root.viewWorkspaceLabel
                + "  ·  Tab / PgUp·PgDn switch  ·  ←→↑↓ windows  ·  Enter activate  ·  Esc")
           color: root.foreground
           style: Text.Outline
