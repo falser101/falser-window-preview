@@ -53,6 +53,27 @@ function isOnWorkspace(toplevel, workspace) {
   return Boolean(workspaceName) && String(toplevelWorkspace.name || "") === workspaceName
 }
 
+// Hyprland gives special workspaces (scratchpad, ...) negative ids.
+function isSpecialWorkspaceId(workspaceId) {
+  var id = Number(workspaceId)
+  return isFinite(id) && id < 0
+}
+
+function isValidWorkspaceId(workspaceId) {
+  var id = Number(workspaceId)
+  return isFinite(id) && id !== 0
+}
+
+function workspaceLabel(workspaces, workspaceId) {
+  var id = Number(workspaceId)
+  if (isSpecialWorkspaceId(id)) {
+    var workspace = workspaceById(workspaces, id)
+    var name = String((workspace && workspace.name) || "special")
+    return name.replace(/^special:/, "") || "special"
+  }
+  return id === 10 ? "0" : String(id)
+}
+
 function isOnWorkspaceId(toplevel, workspaceId) {
   var toplevelWorkspace = toplevel && toplevel.workspace ? toplevel.workspace : null
   if (!toplevelWorkspace)
@@ -63,7 +84,7 @@ function isOnWorkspaceId(toplevel, workspaceId) {
 function collect(toplevels, filterText, workspaceId) {
   var out = []
   var values = toplevels || []
-  var hasWorkspace = workspaceId !== null && workspaceId !== undefined && Number(workspaceId) > 0
+  var hasWorkspace = isValidWorkspaceId(workspaceId)
   for (var i = 0; i < values.length; i++) {
     var top = values[i]
     if (!isEligible(top))
@@ -95,15 +116,20 @@ function workspaceIds(workspaces, minSlots) {
   for (var n = 1; n <= slots; n++)
     ids.push(n)
 
+  var specialIds = []
   var values = workspaces || []
   for (var i = 0; i < values.length; i++) {
     var id = Number(values[i].id)
     if (id > 0 && id <= 10 && ids.indexOf(id) === -1)
       ids.push(id)
+    else if (isSpecialWorkspaceId(id) && specialIds.indexOf(id) === -1)
+      specialIds.push(id)
   }
 
   ids.sort(function(left, right) { return left - right })
-  return ids
+  // Special workspaces follow the numbered ones, most recent first.
+  specialIds.sort(function(left, right) { return right - left })
+  return ids.concat(specialIds)
 }
 
 function workspaceById(workspaces, id) {
