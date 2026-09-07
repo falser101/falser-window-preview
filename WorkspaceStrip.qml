@@ -35,6 +35,8 @@ Item {
         readonly property bool liveFocused: Hyprland.focusedWorkspace
           && Number(Hyprland.focusedWorkspace.id) === workspaceId
         readonly property int windowCount: WindowModel.countOnWorkspace(strip.allToplevels, workspaceId)
+        readonly property bool special: WindowModel.isSpecialWorkspaceId(workspaceId)
+        readonly property string label: WindowModel.workspaceLabel(strip.controller.allWorkspaces, workspaceId)
 
         width: strip.chipWidth
         height: strip.chipHeight
@@ -50,13 +52,16 @@ Item {
 
           Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: workspaceId === 10 ? "0" : String(workspaceId)
+            width: Math.min(implicitWidth, strip.chipWidth - Style.space(12))
+            text: label
             color: "#ffffff"
             style: Text.Outline
             styleColor: "#80000000"
             font.family: Style.font.menuFamily
-            font.pixelSize: Style.font.title
+            font.pixelSize: special ? Style.font.subtitle : Style.font.title
             font.bold: selected
+            elide: Text.ElideRight
+            horizontalAlignment: Text.AlignHCenter
           }
 
           Row {

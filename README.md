@@ -8,6 +8,7 @@ KDE Overview–style window browser for [Omarchy](https://omarchy.org/) (Quattro
 
 - Browse window previews on the **current workspace**
 - Switch workspaces from the top strip (Hyprland follows)
+- Special workspaces such as the scratchpad get their own chip after the numbered ones
 - Click / Enter a preview to focus that window and close overview
 - **Responsive grid**: more windows → wrap + shrink to fit one screen
 - Configurable **hot corner** (top-left or top-right)
