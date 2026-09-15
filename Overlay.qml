@@ -35,8 +35,13 @@ Item {
   readonly property int hotCornerReach: Style.space(48)
   readonly property int hotCornerDepth: Style.space(6)
   property bool hotCornerArmed: true
+  // Headless outputs (Sunshine stream target) are not visible to the user.
+  readonly property var physicalScreens: Quickshell.screens.filter(function(s) {
+    return !/^HEADLESS/.test(String(s.name || ""))
+  })
 
   property bool opened: false
+  property var overlayScreen: null
   property string filterText: ""
   property int selectedIndex: 0
   property var selectedToplevel: null
@@ -129,6 +134,8 @@ Item {
   }
 
   function open(payloadJson) {
+    var monitor = Hyprland.focusedMonitor
+    root.overlayScreen = monitor && monitor.screen ? monitor.screen : null
     root.opened = true
     root.filterText = ""
     root.focusPane = "windows"
@@ -409,7 +416,7 @@ Item {
   // Invisible L-shaped hit targets on each screen while overview is closed.
   Variants {
     id: hotCornerInstances
-    model: root.hotCornerEnabled && !root.opened ? Quickshell.screens : []
+    model: root.hotCornerEnabled && !root.opened ? root.physicalScreens : []
 
     PanelWindow {
       required property var modelData
@@ -459,6 +466,10 @@ Item {
   PanelWindow {
     id: panel
     visible: root.opened
+    // Without a screen the overlay lands on the first output, which can be an
+    // invisible headless one. Taken once per open, so a workspace switch to
+    // another monitor from the strip does not move the window mid-use.
+    screen: root.overlayScreen
     anchors { top: true; bottom: true; left: true; right: true }
     color: "#0b0b0b"
     WlrLayershell.namespace: "falser-window-preview"
